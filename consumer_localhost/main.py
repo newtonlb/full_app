@@ -6,43 +6,46 @@ import cv2
 import numpy as np
 from flask import Flask, Response, render_template
 from kafka import KafkaConsumer
+import os
 
-W = 512
-H = 288
-
+W = 320
+H = 280
+print(os.path.isfile('./haarcascade_frontalface_dataset.xml'))
+cascPath = './haarcascade_frontalface_dataset.xml'  # dataset
+faceCascade = cv2.CascadeClassifier(cascPath)
 # Instantiate Kafka Consumers
 consumer = KafkaConsumer(
     'camera2',
-    auto_offset_reset='earliest',
-    enable_auto_commit=True,
+    auto_offset_reset='latest',
+    enable_auto_commit=False,
     group_id='my-group-1',
     value_deserializer=lambda m: loads(m.decode('utf-8')),
     bootstrap_servers=['localhost:9092'])
 
-consumer2 = KafkaConsumer(
-    'test',
-    auto_offset_reset='earliest',
-    enable_auto_commit=True,
-    group_id='my-group-1',
-    value_deserializer=lambda m: loads(m.decode('utf-8')),
-    bootstrap_servers=['localhost:9092'])
+# consumer2 = KafkaConsumer(
+#     'test',
+#     auto_offset_reset='latest',
+#     enable_auto_commit=True,
+#     group_id='my-group-1',
+#     value_deserializer=lambda m: loads(m.decode('utf-8')),
+#     bootstrap_servers=['localhost:9092'])
 
 # Instantiate Kafka Consumers
-consumer3 = KafkaConsumer(
-    'camera2',
-    auto_offset_reset='earliest',
-    enable_auto_commit=True,
-    group_id='my-group-1',
-    value_deserializer=lambda m: loads(m.decode('utf-8')),
-    bootstrap_servers=['localhost:9092'])
+# consumer3 = KafkaConsumer(
+#     'camera2',
+#     auto_offset_reset='latest',
+#     enable_auto_commit=True,
+#     group_id='my-group-1',
+#     value_deserializer=lambda m: loads(m.decode('utf-8')),
+#     bootstrap_servers=['localhost:9092'])
 
-consumer4 = KafkaConsumer(
-    'test',
-    auto_offset_reset='earliest',
-    enable_auto_commit=True,
-    group_id='my-group-1',
-    value_deserializer=lambda m: loads(m.decode('utf-8')),
-    bootstrap_servers=['localhost:9092'])
+# consumer4 = KafkaConsumer(
+#     'test',
+#     auto_offset_reset='latest',
+#     enable_auto_commit=True,
+#     group_id='my-group-1',
+#     value_deserializer=lambda m: loads(m.decode('utf-8')),
+#     bootstrap_servers=['localhost:9092'])
 
 # Set the App to be Flask based
 app = Flask(__name__)
@@ -63,25 +66,25 @@ def video_feed():
     return Response(get_stream(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
-@app.route('/video_feed2')
-def video_feed2():
-    return Response(get_stream2(), mimetype='multipart/x-mixed-replace; boundary=frame')
+# @app.route('/video_feed2')
+# def video_feed2():
+#     return Response(get_stream2(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
-@app.route('/video_feed3')
-def video_feed3():
-    return Response(get_stream3(), mimetype='multipart/x-mixed-replace; boundary=frame')
+# @app.route('/video_feed3')
+# def video_feed3():
+#     return Response(get_stream3(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
-@app.route('/video_feed4')
-def video_feed4():
-    return Response(get_stream4(), mimetype='multipart/x-mixed-replace; boundary=frame')
+# @app.route('/video_feed4')
+# def video_feed4():
+#     return Response(get_stream4(), mimetype='multipart/x-mixed-replace; boundary=frame')
 
 
 def get_stream():
     print('Listening to Feed 1...')
     count = 0
-    for msg in consumer2:
+    for msg in consumer:
         # Conversion: base-64 string --> array of bytes --> array of integers
         val = msg.value
         base64string = val['pix']  # pix is base-64 encoded string
@@ -97,10 +100,27 @@ def get_stream():
         imgB = npArray[2::4].reshape((H, W))
         img = np.stack((imgR, imgG, imgB))
         img = np.moveaxis(img, 0, -1)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+
+        faces = faceCascade.detectMultiScale(
+            gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(30, 30),
+            flags=cv2.CASCADE_SCALE_IMAGE
+        )
+        #print(len(faces))
+
+        # Draw a rectangle around the faces
+        for (x, y, w, h) in faces:
+            cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
         success, a_numpy = cv2.imencode('.jpg', img)
+
         a = a_numpy.tostring()
         count += 1
-        print('Feed 1: Displaying packet {}'.format(count))
+        #print('Feed 1: Displaying packet {}'.format(count))
         yield (b'--frame\r\n'
                b'Content-Type: image/jpg\r\n\r\n' + a + b'\r\n\r\n')
 
@@ -222,4 +242,4 @@ def get_stream4():
 
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port='5000', debug=False)
+    app.run(host='0.0.0.0', port='5000', debug=False, threaded=True)

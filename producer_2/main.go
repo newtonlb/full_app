@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"time"
+
 	"github.com/Shopify/sarama"
 	"github.com/adaickalavan/kafkapc"
 	"gocv.io/x/gocv"
@@ -24,7 +25,7 @@ var producer2 sarama.AsyncProducer
 var ntopic string = "camera2"
 
 // Instantiate the RSTP Link
-var rstp_link = "rtsp://freja.hiof.no:1935/rtplive/_definst_/hessdalen02.stream"
+var rstp_link = "rtsp://192.168.16.15:8554/live.sdp"
 
 func main() {
 	//Sarama logger
@@ -53,8 +54,8 @@ func main() {
 			continue
 		}
 
- 		resultImage := gocv.NewMatWithSize(512, 288, gocv.MatTypeCV8U)
-		gocv.Resize(frame, &resultImage, image.Pt(resultImage.Rows(), resultImage.Cols()), 0, 0, gocv.InterpolationCubic)
+		resultImage := gocv.NewMatWithSize(320, 280, gocv.MatTypeCV8U)
+		gocv.Resize(frame, &resultImage, image.Pt(resultImage.Rows(), resultImage.Cols()), 0, 0, gocv.InterpolationLinear)
 
 		// Type assert frame into RGBA image
 		imgInterface, err := resultImage.ToImage()
